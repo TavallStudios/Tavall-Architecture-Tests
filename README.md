@@ -26,6 +26,18 @@ It includes the complete `tavall-architecture-tests` module plus the architectur
 
 The copied Gradle module still references Project Novus project paths. This migration establishes canonical source ownership first; standalone multi-repository execution wiring is a separate integration step so the initial move can remain 1:1 instead of quietly rewriting the tests during relocation.
 
+## Shared architecture contracts
+
+`TavallArchitectureContracts` is the reusable cross-repository contract layer.
+Consumers can supply their real command registry, MCP catalog projection, public
+parameter names, and pull-request ancestry snapshot to verify that workspace or
+lease identities do not become public authority, MCP does not mirror CLI
+commands, command help matches the accepted registry, and every active normal or
+Sub-Staging pull request reaches one active repository/release staging root.
+
+Cloud-specific behavior remains tested in `Tavall Cloud`; this repository owns
+the portable invariants that prevent architectural drift across consumers.
+
 ## Consumer rule
 
 Until centralized execution is wired into every consumer, repository-local copies may exist only as compatibility mirrors. Architecture-test changes should originate here first, then be synchronized into consumers. The end state is one maintained source of truth rather than a small civilization of nearly-identical test suites drifting apart.
