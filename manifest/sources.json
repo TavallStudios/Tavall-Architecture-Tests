@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "canonicalRepository": "TavallStudios/Tavall-Architecture-Tests",
+  "imports": [
+    {
+      "repository": "TavallStudios/tavall-project-novus",
+      "commit": "705a17b7db22a6012f3cdefe99328129842301a0",
+      "files": [
+        {"path":"tavall-architecture-tests/build.gradle.kts","blob":"a52132af35e28a6dfa0b693bbf2056050ab9fd0a"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallArchitectureRuleSet.java","blob":"2146d80714eb50257a9074eb7daa0b85600dc983"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallCloudFullRuntimeSimulationTest.java","blob":"5c7fa0668e9dd18827faf0301493173a528736dd"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallDependencyMapArchitectureTest.java","blob":"8604d7d97afc4e51f862676dcaf4fe5638dc1274"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallDependencyMapIndex.java","blob":"d7c44366f804b420f530979afadf4bcb7bb98a70"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallDiscordFullRuntimeSimulationTest.java","blob":"4985d8993693cc3a751f80576a92af75fcd92ada"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallFullRuntimeSimulationHarness.java","blob":"650bb9b915caada62848912804eb13381b2c9b99"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallPaperFullRuntimeSimulationTest.java","blob":"7f8dbcf845608771d1969b6e696e924ef6179e8c"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallProductionClassArchitectureTest.java","blob":"c2eea3188ba95475e47a9da8c8a16a264b1cbe5f"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallProductionClassIndex.java","blob":"ad54d805a520d76d1e257e7be98203afd339d039"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallUnifiedFullRuntimeSimulationTest.java","blob":"be7fa5563fdcba3e8a10cf3342e2db2b5e5c6c4f"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallVelocityFullRuntimeSimulationTest.java","blob":"cb8aac755ffae2e87e8b1a47952acfe1279bdf2e"},
+        {"path":"tavall-architecture-tests/src/test/java/org/tavall/architecture/TavallWebFullRuntimeSimulationTest.java","blob":"7f03808b6ce7feb7ac3f825351d1ddfa3524f846"},
+        {"path":"novus-ffa/src/test/java/org/tavall/minecraft/ffa/kit/npc/FFAKitNpcArchitectureTest.java","blob":"72b1c4276c8e25bf163d8fbe99ca8301112e3d1e"},
+        {"path":"minecraft-framework/backend-api/src/test/java/org/tavall/api/minecraft/backend/moderation/ModerationArchitectureTest.java","blob":"7c11c020ad351993f8c52ea0a2ef4591240aae57"},
+        {"path":"novus-ffa/src/test/java/org/tavall/minecraft/ffa/runtime/FFARuntimeServiceArchitectureTest.java","blob":"acd834ab4a4c9687b78c690c13cd43d08f584f5f"},
+        {"path":"novus-ffa/src/test/java/org/tavall/minecraft/ffa/bootstrap/FFADependencyArchitectureTest.java","blob":"9ff5ccc00c7d6c0ba93f232bd38507dae448dec4"}
+      ]
+    }
+  ]
+}
