@@ -60,6 +60,16 @@ final class TavallArchitectureContracts {
             );
         }
         requireNoPublicWorkspaceAuthority(publicMcpNames, Set.of());
+        requireExecutionOnlySandboxes(publicMcpNames);
+    }
+
+    static void requireExecutionOnlySandboxes(Collection<String> publicCapabilityNames) {
+        for (String capability : normalize(publicCapabilityNames, "public capability names")) {
+            String normalized = capability.replace(' ', '_').replace('-', '_');
+            if (normalized.matches("(?:cloud_)?sandbox_(?:git|github|codex)(?:_.*)?")) {
+                throw new IllegalStateException("Sandbox exposes repository authority: " + capability);
+            }
+        }
     }
 
     static void requireCommandProjection(
@@ -68,6 +78,7 @@ final class TavallArchitectureContracts {
     ) {
         Set<String> accepted = normalize(acceptedCommandForms, "accepted command forms");
         Set<String> advertised = normalize(advertisedCommandForms, "advertised command forms");
+        requireExecutionOnlySandboxes(accepted);
         if (!accepted.equals(advertised)) {
             Set<String> missing = new LinkedHashSet<>(accepted);
             missing.removeAll(advertised);
