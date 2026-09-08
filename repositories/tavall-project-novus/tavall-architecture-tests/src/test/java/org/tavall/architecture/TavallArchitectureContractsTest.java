@@ -12,6 +12,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class TavallArchitectureContractsTest {
     @Test
+    void sandboxExecutionDoesNotRepublishRepositoryOrAgentJobAuthority() {
+        assertDoesNotThrow(() -> TavallArchitectureContracts.requireExecutionOnlySandboxes(
+                Set.of("sandbox acquire", "sandbox execute", "cloud_sandbox_exec",
+                        "environment repository git push", "environment repository codex job start")));
+        for (String capability : Set.of("sandbox git", "sandbox github", "sandbox codex",
+                "cloud_sandbox_git", "cloud_sandbox_github_comment_delete", "cloud_sandbox_codex")) {
+            assertThrows(IllegalStateException.class,
+                    () -> TavallArchitectureContracts.requireExecutionOnlySandboxes(Set.of(capability)));
+        }
+    }
+
+    @Test
     void distinguishesDeploymentReleasesFromLeaseAuthority() {
         assertDoesNotThrow(() -> TavallArchitectureContracts.requireNoPublicWorkspaceAuthority(
                 Set.of("service deploy releases", "cloud_release_inspect"), Set.of("releaseId", "pleaseConfirm")));
