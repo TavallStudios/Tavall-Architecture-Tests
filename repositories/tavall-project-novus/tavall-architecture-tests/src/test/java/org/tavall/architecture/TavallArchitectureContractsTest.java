@@ -12,6 +12,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class TavallArchitectureContractsTest {
     @Test
+    void distinguishesDeploymentReleasesFromLeaseAuthority() {
+        assertDoesNotThrow(() -> TavallArchitectureContracts.requireNoPublicWorkspaceAuthority(
+                Set.of("service deploy releases", "cloud_release_inspect"), Set.of("releaseId", "pleaseConfirm")));
+        for (String parameter : Set.of("leaseId", "environmentLeaseGeneration", "lease_token", "leaseid")) {
+            assertThrows(IllegalStateException.class, () -> TavallArchitectureContracts.requireNoPublicWorkspaceAuthority(
+                    Set.of("environment repository read"), Set.of(parameter)));
+        }
+    }
+
+    @Test
     void acceptsNativeMcpAndExactCliProjectionsWithoutWorkspaceIdentity() {
         assertDoesNotThrow(() -> TavallArchitectureContracts.requireMcpProjection(
                 Set.of("cloud_catalog_list", "cloud_status"),

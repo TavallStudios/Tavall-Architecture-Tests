@@ -59,7 +59,7 @@ final class TavallArchitectureContracts {
                     "MCP republishes CLI capabilities: " + cliMirrors
             );
         }
-        requireNoPublicWorkspaceAuthority(publicNames, Set.of());
+        requireNoPublicWorkspaceAuthority(publicMcpNames, Set.of());
     }
 
     static void requireCommandProjection(
@@ -141,17 +141,20 @@ final class TavallArchitectureContracts {
     }
 
     private static void addForbidden(Collection<String> values, Set<String> forbidden) {
-        normalize(values, "public names").stream()
-                .filter(TavallArchitectureContracts::isForbiddenPublicIdentity)
-                .forEach(forbidden::add);
+        Objects.requireNonNull(values, "public names");
+        for (String value : values) {
+            String normalized = normalizeOne(value, "public names");
+            if (isForbiddenPublicIdentity(value)) forbidden.add(normalized);
+        }
     }
 
     private static boolean isForbiddenPublicIdentity(String value) {
-        String normalized = value.replace('-', '_');
+        String normalized = value.replaceAll("([a-z0-9])([A-Z])", "$1_$2")
+                .toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
         return normalized.contains("workspace")
                 || normalized.contains("work_path")
                 || normalized.equals("workpath")
-                || normalized.contains("lease");
+                || normalized.matches("(?:.*_)?lease(?:id|generation|token)?(?:_.*)?");
     }
 
     private static Set<String> normalize(Collection<String> values, String label) {
