@@ -86,7 +86,10 @@ subprojects {
 }
 
 gradle.projectsEvaluated {
+    val verificationProjects = subprojects.filter { project ->
+        project.plugins.hasPlugin("java") && project.tasks.findByName("check") != null
+    }
     tasks.named("check") {
-        dependsOn(subprojects.map { it.tasks.named("check") })
+        dependsOn(verificationProjects.map { project -> project.tasks.named("check") })
     }
 }
