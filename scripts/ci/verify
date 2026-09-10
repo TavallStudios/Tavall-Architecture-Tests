@@ -27,3 +27,16 @@ printf 'Profile: %s\n' "${profile}"
 
 "${gradle_cmd[@]}" --version
 "${gradle_cmd[@]}" clean check --no-daemon --stacktrace
+
+# Publication metadata is part of the consumer contract. Validate every module,
+# the implementation plugin, and the generated Gradle plugin marker locally
+# without mutating the remote package registry.
+"${gradle_cmd[@]}" --no-daemon --stacktrace \
+  :gradle-plugin:publishToMavenLocal \
+  :modules:core:publishToMavenLocal \
+  :modules:patterns:publishToMavenLocal \
+  :modules:di:publishToMavenLocal \
+  :modules:registry:publishToMavenLocal \
+  :modules:cache:publishToMavenLocal \
+  :modules:database:publishToMavenLocal \
+  :modules:runtime:publishToMavenLocal
