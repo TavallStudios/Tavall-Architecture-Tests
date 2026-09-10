@@ -84,7 +84,14 @@ final class TavallArchitectureTestsPluginTest {
         Files.delete(violatingSource);
         Files.writeString(
                 packageDirectory.resolve("PlayerService.java"),
-                "package org.tavall.demo; public final class PlayerService {}\n"
+                """
+                package org.tavall.demo;
+                public final class PlayerService {
+                    public static void main(String[] args) {
+                        Runtime.getRuntime().addShutdownHook(new Thread(() -> {}, "player-service-shutdown"));
+                    }
+                }
+                """
         );
 
         BuildResult accepted = runner(projectDirectory)
