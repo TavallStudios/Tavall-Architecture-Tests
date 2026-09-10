@@ -4,6 +4,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(gradleTestKit())
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
@@ -17,4 +18,12 @@ gradlePlugin {
             description = "Runs selected canonical Tavall architecture-test modules against a consumer project."
         }
     }
+}
+
+tasks.test {
+    dependsOn(
+        ":modules:core:publishToMavenLocal",
+        ":modules:patterns:publishToMavenLocal",
+    )
+    systemProperty("tavall.architecture.testVersion", project.version.toString())
 }

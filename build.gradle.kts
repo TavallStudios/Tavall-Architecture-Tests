@@ -85,6 +85,8 @@ subprojects {
     }
 }
 
-tasks.named("check") {
-    dependsOn(subprojects.map { it.tasks.named("check") })
+gradle.projectsEvaluated {
+    tasks.named("check") {
+        dependsOn(subprojects.map { it.tasks.named("check") })
+    }
 }

@@ -108,7 +108,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
         project.getTasks().named("check").configure(task -> task.dependsOn(architectureTest));
 
         project.afterEvaluate(ignored -> {
-            String version = pluginVersion();
+            String version = architectureVersion(project);
             LinkedHashSet<String> selected = new LinkedHashSet<>();
             selected.add("core");
             for (String requested : extension.getModules().get()) {
@@ -146,11 +146,16 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
         });
     }
 
-    private static String pluginVersion() {
+    private static String architectureVersion(Project project) {
+        Object override = project.findProperty("tavallArchitectureVersion");
+        if (override != null && !override.toString().isBlank()) {
+            return override.toString().strip();
+        }
         String version = TavallArchitectureTestsPlugin.class.getPackage().getImplementationVersion();
         if (version == null || version.isBlank()) {
             throw new IllegalStateException(
-                    "Tavall architecture plugin has no implementation version; use a published plugin artifact."
+                    "Tavall architecture plugin has no implementation version; use a published plugin artifact "
+                            + "or set tavallArchitectureVersion for an intentional local/composite test."
             );
         }
         return version;
