@@ -66,12 +66,19 @@ final class TavallArchitectureTestsPluginTest {
                 "package org.tavall.demo; public final class LegacyRepository {}\n"
         );
 
-        BuildResult rejected = runner(projectDirectory, version)
+        BuildResult rejected = runner(projectDirectory)
                 .withArguments("clean", "check", "--stacktrace", "-PtavallArchitectureVersion=" + version)
                 .buildAndFail();
+        assertNotNull(rejected.task(":architectureTest"));
+        assertEquals(TaskOutcome.FAILED, rejected.task(":architectureTest").getOutcome());
+        Path resultFile = projectDirectory.resolve(
+                "build/test-results/architectureTest/TEST-org.tavall.architecture.core.CanonicalArchitectureTest.xml"
+        );
+        assertTrue(Files.isRegularFile(resultFile), "architectureTest must emit a JUnit result file");
+        String rejectedResult = Files.readString(resultFile);
         assertTrue(
-                rejected.getOutput().contains("repository-type|org.tavall.demo.LegacyRepository"),
-                rejected.getOutput()
+                rejectedResult.contains("repository-type|org.tavall.demo.LegacyRepository"),
+                rejectedResult
         );
 
         Files.delete(violatingSource);
@@ -80,7 +87,7 @@ final class TavallArchitectureTestsPluginTest {
                 "package org.tavall.demo; public final class PlayerService {}\n"
         );
 
-        BuildResult accepted = runner(projectDirectory, version)
+        BuildResult accepted = runner(projectDirectory)
                 .withArguments("clean", "check", "--stacktrace", "-PtavallArchitectureVersion=" + version)
                 .build();
         assertNotNull(accepted.task(":architectureTest"));
@@ -88,7 +95,7 @@ final class TavallArchitectureTestsPluginTest {
         assertEquals(TaskOutcome.SUCCESS, accepted.task(":check").getOutcome());
     }
 
-    private static GradleRunner runner(Path projectDirectory, String version) {
+    private static GradleRunner runner(Path projectDirectory) {
         return GradleRunner.create()
                 .withProjectDir(projectDirectory.toFile())
                 .withPluginClasspath()

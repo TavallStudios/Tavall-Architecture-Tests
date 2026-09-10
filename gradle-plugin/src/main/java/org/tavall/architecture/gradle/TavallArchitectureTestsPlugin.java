@@ -10,6 +10,7 @@ import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.Sync;
 import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.testing.Test;
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat;
 
 import java.io.File;
 import java.util.LinkedHashSet;
@@ -84,6 +85,10 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                     ));
                     task.useJUnitPlatform();
                     task.setMaxParallelForks(1);
+                    task.getTestLogging().setExceptionFormat(TestExceptionFormat.FULL);
+                    task.getTestLogging().setShowCauses(true);
+                    task.getTestLogging().setShowExceptions(true);
+                    task.getTestLogging().setShowStackTraces(true);
                     task.doFirst(ignored -> {
                         task.systemProperty(
                                 "tavall.architecture.classRoots",
