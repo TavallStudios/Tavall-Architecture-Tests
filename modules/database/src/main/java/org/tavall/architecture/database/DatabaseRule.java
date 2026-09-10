@@ -3,12 +3,22 @@ package org.tavall.architecture.database;
 import org.tavall.architecture.core.ArchitectureContext;
 import org.tavall.architecture.core.ArchitectureRule;
 import org.tavall.architecture.core.ArchitectureViolation;
-import org.tavall.architecture.core.ProductionClass;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 
 public final class DatabaseRule implements ArchitectureRule {
+    private static final Map<String, String> FORBIDDEN_APPLICATION_BOUNDARIES = Map.of(
+            "jakarta.persistence.EntityManager", "Application code must not own EntityManager lifecycle",
+            "jakarta.persistence.EntityManagerFactory", "Application code must not own EntityManagerFactory lifecycle",
+            "java.sql.DriverManager", "Application code must not open raw JDBC connections through DriverManager"
+    );
+
     @Override
     public String id() {
         return "tavall-database";
@@ -17,20 +27,38 @@ public final class DatabaseRule implements ArchitectureRule {
     @Override
     public List<ArchitectureViolation> validate(ArchitectureContext context) {
         List<ArchitectureViolation> violations = new ArrayList<>();
-        for (ProductionClass productionClass : context.productionClasses()) {
-            if (!productionClass.loaded()) {
-                continue;
-            }
-            String name = productionClass.type().getSimpleName();
-            if (name.endsWith("Repository") || name.endsWith("RepositoryImpl")
-                    || name.endsWith("RepositoryAdapter") || name.endsWith("RepositoryStore")) {
-                violations.add(new ArchitectureViolation(
-                        "database-repository-layer",
-                        productionClass.className(),
-                        "Application repository layers are prohibited; use Tavall Database or name the actual capability"
-                ));
-            }
+        for (Path sourceRoot : context.sourceRoots()) {
+            scanSources(sourceRoot, violations);
         }
         return List.copyOf(violations);
+    }
+
+    private static void scanSources(Path root, List<ArchitectureViolation> violations) {
+        try (Stream<Path> paths = Files.walk(root)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".java"))
+                    .sorted()
+                    .forEach(path -> inspectSource(root, path, violations));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to scan Java source root " + root, exception);
+        }
+    }
+
+    private static void inspectSource(Path root, Path path, List<ArchitectureViolation> violations) {
+        try {
+            String source = Files.readString(path);
+            String subject = root.relativize(path).toString().replace('\\', '/');
+            FORBIDDEN_APPLICATION_BOUNDARIES.forEach((typeName, message) -> {
+                if (source.contains("import " + typeName + ";") || source.contains(typeName + ".")) {
+                    violations.add(new ArchitectureViolation(
+                            "database-direct-boundary",
+                            subject + "->" + typeName,
+                            message + "; use the checked-in Tavall Database entity contract"
+                    ));
+                }
+            });
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to read production source " + path, exception);
+        }
     }
 }

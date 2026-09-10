@@ -3,6 +3,7 @@ package org.tavall.architecture.gradle;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.credentials.PasswordCredentials;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
@@ -17,6 +18,8 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
+    private static final String PACKAGES_URL =
+            "https://maven.pkg.github.com/TavallStudios/Tavall-Architecture-Tests";
     private static final Set<String> SUPPORTED_MODULES = Set.of(
             "core", "patterns", "di", "registry", "cache", "database", "runtime"
     );
@@ -24,6 +27,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
         project.getPluginManager().apply(JavaPlugin.class);
+        configureArchitectureRepository(project);
 
         TavallArchitectureTestsExtension extension = project.getExtensions().create(
                 "architectureTests",
@@ -119,6 +123,26 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                 project.getDependencies().add(moduleArtifacts.getName(), coordinate);
                 project.getDependencies().add(runtime.getName(), coordinate);
             }
+        });
+    }
+
+    private static void configureArchitectureRepository(Project project) {
+        String token = System.getenv("GITHUB_TOKEN");
+        if (token == null || token.isBlank()) {
+            return;
+        }
+        String actor = System.getenv("GITHUB_ACTOR");
+        if (actor == null || actor.isBlank()) {
+            actor = "github";
+        }
+        String username = actor;
+        project.getRepositories().maven(repository -> {
+            repository.setName("TavallArchitectureTests");
+            repository.setUrl(project.uri(PACKAGES_URL));
+            repository.credentials(PasswordCredentials.class, credentials -> {
+                credentials.setUsername(username);
+                credentials.setPassword(token);
+            });
         });
     }
 
