@@ -15,6 +15,9 @@ import java.util.stream.Stream;
 
 public final class NamingAndSourceRule implements ArchitectureRule {
     private static final Pattern VAR_LOCAL = Pattern.compile("(?m)^\\s*var\\s+[A-Za-z_$][A-Za-z0-9_$]*\\s*=");
+    private static final Pattern SHUTDOWN_HOOK_THREAD = Pattern.compile(
+            "Runtime\\s*\\.\\s*getRuntime\\s*\\(\\s*\\)\\s*\\.\\s*addShutdownHook\\s*\\(\\s*new\\s+Thread\\s*\\("
+    );
     private static final List<String> THREAD_CREATION = List.of(
             "new Thread(",
             "Thread.startVirtualThread(",
@@ -81,8 +84,9 @@ public final class NamingAndSourceRule implements ArchitectureRule {
                         "Production Java local variables must use explicit declared types"
                 ));
             }
+            String threadScanSource = SHUTDOWN_HOOK_THREAD.matcher(source).replaceAll("Runtime.getRuntime().addShutdownHook(");
             for (String marker : THREAD_CREATION) {
-                if (source.contains(marker)) {
+                if (threadScanSource.contains(marker)) {
                     violations.add(new ArchitectureViolation(
                             "direct-thread-creation",
                             subject,
