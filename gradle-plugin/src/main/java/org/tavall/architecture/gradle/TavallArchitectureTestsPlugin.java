@@ -3,7 +3,7 @@ package org.tavall.architecture.gradle;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.credentials.PasswordCredentials;
+import org.gradle.api.artifacts.repositories.PasswordCredentials;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
