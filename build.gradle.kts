@@ -65,7 +65,7 @@ subprojects {
             if (project.path.startsWith(":modules:")) {
                 publications.create<MavenPublication>("mavenJava") {
                     from(components["java"])
-                    artifactId = project.name
+                    artifactId = "tavall-architecture-${project.name}"
                 }
             }
             repositories {
