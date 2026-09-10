@@ -26,4 +26,12 @@ tasks.test {
         ":modules:patterns:publishToMavenLocal",
     )
     systemProperty("tavall.architecture.testVersion", project.version.toString())
+    testLogging {
+        events("failed", "standardOut", "standardError")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showCauses = true
+        showExceptions = true
+        showStackTraces = true
+        showStandardStreams = true
+    }
 }
