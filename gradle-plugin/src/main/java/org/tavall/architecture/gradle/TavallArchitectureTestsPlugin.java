@@ -220,9 +220,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
         properties.put("tavall.architecture.sourceRoots", joinExistingDirectories(targets.stream()
                 .flatMap(target -> target.main().getAllJava().getSourceDirectories().getFiles().stream())
                 .toList()));
-        properties.put("tavall.architecture.testSourceRoots", joinExistingDirectories(targets.stream()
-                .flatMap(target -> target.test().getAllJava().getSourceDirectories().getFiles().stream())
-                .toList()));
+        properties.put("tavall.architecture.testSourceRoots", joinExistingDirectories(testSourceDirectories(project, targets)));
         properties.put(
                 "tavall.architecture.targetProjects",
                 targets.stream().map(target -> target.project().getPath()).sorted().reduce(
@@ -242,6 +240,17 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
             );
         }
         return Map.copyOf(properties);
+    }
+
+    private static List<File> testSourceDirectories(Project applyingProject, List<ArchitectureTarget> targets) {
+        LinkedHashSet<File> roots = new LinkedHashSet<>();
+        SourceSetContainer applyingSourceSets = applyingProject.getExtensions().getByType(SourceSetContainer.class);
+        roots.addAll(applyingSourceSets.getByName(SourceSet.TEST_SOURCE_SET_NAME)
+                .getAllJava().getSourceDirectories().getFiles());
+        for (ArchitectureTarget target : targets) {
+            roots.addAll(target.test().getAllJava().getSourceDirectories().getFiles());
+        }
+        return List.copyOf(roots);
     }
 
     private static void generateTestScaffold(Project applyingProject, List<ArchitectureTarget> targets) {
