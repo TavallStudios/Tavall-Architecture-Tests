@@ -70,7 +70,11 @@ final class TavallArchitectureTestsPluginTest {
                 "build/test-results/architectureTest/TEST-org.tavall.architecture.core.CanonicalArchitectureTest.xml"
         );
         assertTrue(Files.isRegularFile(resultFile));
-        assertTrue(Files.readString(resultFile).contains("repository-type|org.tavall.demo.LegacyRepository"));
+        Path reportFile = projectDirectory.resolve("build/reports/tavall-architecture/architecture-report.json");
+        String rejectedReport = Files.readString(reportFile);
+        assertTrue(rejectedReport.contains("\"ruleId\":\"repository-type\""), rejectedReport);
+        assertTrue(rejectedReport.contains("\"className\":\"org.tavall.demo.LegacyRepository\""), rejectedReport);
+        assertTrue(rejectedReport.contains("\"startLine\":"), rejectedReport);
 
         Files.delete(violatingSource);
         Files.writeString(
@@ -151,7 +155,12 @@ final class TavallArchitectureTestsPluginTest {
         Path resultFile = testSuite.resolve(
                 "build/test-results/architectureTest/TEST-org.tavall.architecture.core.CanonicalArchitectureTest.xml"
         );
-        assertTrue(Files.readString(resultFile).contains("repository-type|org.tavall.demo.a.LegacyRepository"));
+        assertTrue(Files.isRegularFile(resultFile));
+        Path reportFile = testSuite.resolve("build/reports/tavall-architecture/architecture-report.json");
+        String rejectedReport = Files.readString(reportFile);
+        assertTrue(rejectedReport.contains("\"ruleId\":\"repository-type\""), rejectedReport);
+        assertTrue(rejectedReport.contains("\"className\":\"org.tavall.demo.a.LegacyRepository\""), rejectedReport);
+        assertTrue(rejectedReport.contains("\"startLine\":"), rejectedReport);
 
         Files.delete(violatingSource);
         Files.writeString(violatingPackage.resolve("InventoryService.java"), "package org.tavall.demo.a; public final class InventoryService {}\n");
