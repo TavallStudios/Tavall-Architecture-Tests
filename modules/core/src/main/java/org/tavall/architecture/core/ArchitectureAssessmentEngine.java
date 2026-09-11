@@ -4,10 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 
@@ -28,22 +26,20 @@ public final class ArchitectureAssessmentEngine {
             throw new IllegalStateException("No canonical architecture rules were discovered from selected modules");
         }
         List<String> families = rules.stream().map(ArchitectureRule::id).distinct().sorted().toList();
-        Map<String, ArchitectureFinding> observed = new LinkedHashMap<>();
+        List<ArchitectureFinding> observed = new ArrayList<>();
         for (ArchitectureRule rule : rules) {
-            for (ArchitectureFinding finding : rule.inspect(context)) {
-                ArchitectureFinding previous = observed.putIfAbsent(finding.debtKey(), finding);
-                if (previous != null) {
-                    throw new IllegalStateException("Duplicate architecture debt key: " + finding.debtKey());
-                }
-            }
+            observed.addAll(rule.inspect(context));
         }
 
         Set<String> debt = loadDebt();
-        List<ArchitectureFindingResult> findingResults = observed.values().stream()
+        List<ArchitectureFindingResult> findingResults = observed.stream()
                 .map(finding -> new ArchitectureFindingResult(finding, debt.contains(finding.debtKey())))
                 .toList();
+        Set<String> observedDebtKeys = observed.stream()
+                .map(ArchitectureFinding::debtKey)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         Set<String> stale = new LinkedHashSet<>(debt);
-        stale.removeAll(observed.keySet());
+        stale.removeAll(observedDebtKeys);
 
         List<ArchitectureClassAssessment> classAssessments = new ArrayList<>();
         for (ProductionClass productionClass : context.productionClasses()) {
