@@ -23,6 +23,7 @@ import org.tavall.architecture.core.TestAuthoringPolicy;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public final class TestAuthoringRule implements ArchitectureRule {
@@ -59,9 +60,11 @@ public final class TestAuthoringRule implements ArchitectureRule {
                     "Test source must parse as Java before it can provide architecture evidence: " + diagnostic.message(),
                     ArchitectureSeverity.BLOCKING,
                     diagnostic.location(),
-                    "tavall-docs/docs/quality/code-architecture/TESTING_AND_GIT.md"
+                    policyReference()
             ));
         }
+
+        inspectRepositorySuiteTests(context, findings);
 
         for (ProductionClass productionClass : context.productionClasses()) {
             if (!TestAuthoringPolicy.requiresDirectTest(productionClass)) {
@@ -79,13 +82,83 @@ public final class TestAuthoringRule implements ArchitectureRule {
                                 + TestAuthoringPolicy.expectedTestRelativePath(productionClass.className()),
                         ArchitectureSeverity.BLOCKING,
                         context.productionSources().locateClass(productionClass.className()).orElse(null),
-                        "tavall-docs/docs/quality/code-architecture/TESTING_AND_GIT.md"
+                        policyReference()
                 ));
                 continue;
             }
             inspectDirectTest(context, productionClass, testType, findings);
         }
         return List.copyOf(findings);
+    }
+
+    private void inspectRepositorySuiteTests(
+            ArchitectureContext context,
+            List<ArchitectureFinding> findings
+    ) {
+        for (JavaSourceUnit unit : context.testSources().units()) {
+            for (JavaTypeSource testType : unit.declaredTypes()) {
+                if (testType.className().contains("$") || !looksLikeTestType(testType.className())) {
+                    continue;
+                }
+                if (productionNameForTest(context, testType.className()).isPresent()) {
+                    continue;
+                }
+                inspectUnmappedTestShape(testType, findings);
+            }
+        }
+    }
+
+    private void inspectUnmappedTestShape(
+            JavaTypeSource testType,
+            List<ArchitectureFinding> findings
+    ) {
+        JavaSourceUnit unit = testType.source();
+        TestImports imports = testImports(unit);
+        int executableTests = 0;
+        for (Tree member : testType.tree().getMembers()) {
+            if (!(member instanceof MethodTree method)) {
+                continue;
+            }
+            String annotation = testAnnotation(method, imports);
+            if (annotation == null) {
+                continue;
+            }
+            if (annotation.equals("junit4")) {
+                findings.add(repositoryTestFinding(
+                        "junit4-test",
+                        testType.className() + "#junit4:" + method.getName(),
+                        "Repository test classes must use JUnit 5 rather than org.junit.Test",
+                        unit.location(method).orElse(testType.location())
+                ));
+                continue;
+            }
+            executableTests++;
+            String methodName = method.getName().toString();
+            if (methodName.startsWith("test")) {
+                findings.add(repositoryTestFinding(
+                        "test-method-name",
+                        testType.className() + "#test-name:" + methodName,
+                        "Test method names must describe behavior rather than use the test* prefix",
+                        unit.location(method).orElse(testType.location())
+                ));
+            }
+            if (methodName.equals(TestAuthoringPolicy.SCAFFOLD_METHOD_NAME)) {
+                findings.add(repositoryTestFinding(
+                        "generated-test-incomplete",
+                        testType.className() + "#generated-scaffold",
+                        "Generated test scaffold is incomplete; replace it with real behavior assertions",
+                        unit.location(method).orElse(testType.location())
+                ));
+            }
+        }
+        if (executableTests == 0) {
+            findings.add(repositoryTestFinding(
+                    "missing-junit5-test-method",
+                    testType.className() + "#junit5-methods",
+                    "Test-shaped repository class must contain at least one JUnit 5 test method",
+                    testType.location()
+            ));
+        }
     }
 
     private void inspectDirectTest(
@@ -108,30 +181,13 @@ public final class TestAuthoringRule implements ArchitectureRule {
             ));
         }
 
-        Set<String> imports = new LinkedHashSet<>();
-        for (ImportTree importTree : unit.compilationUnit().getImports()) {
-            imports.add(importTree.getQualifiedIdentifier().toString());
-        }
-        boolean junit4Imported = imports.contains("org.junit.Test");
-        Set<String> jupiterAnnotations = new LinkedHashSet<>();
-        for (String imported : imports) {
-            if (imported.startsWith("org.junit.jupiter.") || imported.startsWith("org.junit.jupiter.params.")) {
-                int separator = imported.lastIndexOf('.');
-                if (separator >= 0) {
-                    String simple = imported.substring(separator + 1);
-                    if (JUPITER_TEST_ANNOTATIONS.contains(simple)) {
-                        jupiterAnnotations.add(simple);
-                    }
-                }
-            }
-        }
-
+        TestImports imports = testImports(unit);
         int executableTests = 0;
         for (Tree member : testType.tree().getMembers()) {
             if (!(member instanceof MethodTree method)) {
                 continue;
             }
-            String annotation = testAnnotation(method, jupiterAnnotations, junit4Imported);
+            String annotation = testAnnotation(method, imports);
             if (annotation == null) {
                 continue;
             }
@@ -170,7 +226,7 @@ public final class TestAuthoringRule implements ArchitectureRule {
                         "missing-behavior-assertion",
                         productionName + "#assertion:" + methodName,
                         productionName,
-                        "Behavior test must observe a result with an assertion/verification instead of only executing code",
+                        "Direct behavior test must observe a result with an assertion/verification instead of only executing code",
                         unit.location(method).orElse(testType.location())
                 ));
             }
@@ -217,6 +273,29 @@ public final class TestAuthoringRule implements ArchitectureRule {
         }
     }
 
+    private static TestImports testImports(JavaSourceUnit unit) {
+        Set<String> imports = new LinkedHashSet<>();
+        for (ImportTree importTree : unit.compilationUnit().getImports()) {
+            imports.add(importTree.getQualifiedIdentifier().toString());
+        }
+        boolean junit4Imported = imports.contains("org.junit.Test") || imports.contains("org.junit.*");
+        boolean jupiterWildcard = imports.contains("org.junit.jupiter.api.*")
+                || imports.contains("org.junit.jupiter.params.*");
+        Set<String> jupiterAnnotations = new LinkedHashSet<>();
+        for (String imported : imports) {
+            if (imported.startsWith("org.junit.jupiter.") || imported.startsWith("org.junit.jupiter.params.")) {
+                int separator = imported.lastIndexOf('.');
+                if (separator >= 0) {
+                    String simple = imported.substring(separator + 1);
+                    if (JUPITER_TEST_ANNOTATIONS.contains(simple)) {
+                        jupiterAnnotations.add(simple);
+                    }
+                }
+            }
+        }
+        return new TestImports(junit4Imported, jupiterWildcard, Set.copyOf(jupiterAnnotations));
+    }
+
     private static boolean containsBehaviorAssertion(MethodTree method) {
         Boolean result = new TreeScanner<Boolean, Void>() {
             @Override
@@ -252,18 +331,34 @@ public final class TestAuthoringRule implements ArchitectureRule {
                 message,
                 ArchitectureSeverity.BLOCKING,
                 location,
-                "tavall-docs/docs/quality/code-architecture/TESTING_AND_GIT.md"
+                policyReference()
         );
     }
 
-    private static String testAnnotation(
-            MethodTree method,
-            Set<String> jupiterAnnotations,
-            boolean junit4Imported
+    private ArchitectureFinding repositoryTestFinding(
+            String ruleId,
+            String subject,
+            String message,
+            SourceLocation location
     ) {
+        return new ArchitectureFinding(
+                id(),
+                ruleId,
+                subject,
+                null,
+                message,
+                ArchitectureSeverity.BLOCKING,
+                location,
+                policyReference()
+        );
+    }
+
+    private static String testAnnotation(MethodTree method, TestImports imports) {
         for (AnnotationTree annotation : method.getModifiers().getAnnotations()) {
             String name = annotation.getAnnotationType().toString();
-            if (name.equals("org.junit.Test") || (name.equals("Test") && junit4Imported && !jupiterAnnotations.contains("Test"))) {
+            if (name.equals("org.junit.Test")
+                    || (name.equals("Test") && imports.junit4Imported()
+                    && !imports.jupiterWildcard() && !imports.jupiterAnnotations().contains("Test"))) {
                 return "junit4";
             }
             String simpleName = name.substring(name.lastIndexOf('.') + 1);
@@ -271,22 +366,42 @@ public final class TestAuthoringRule implements ArchitectureRule {
                     && JUPITER_TEST_ANNOTATIONS.contains(simpleName)) {
                 return "jupiter";
             }
-            if (jupiterAnnotations.contains(simpleName)) {
+            if (imports.jupiterWildcard() && JUPITER_TEST_ANNOTATIONS.contains(simpleName)) {
+                return "jupiter";
+            }
+            if (imports.jupiterAnnotations().contains(simpleName)) {
                 return "jupiter";
             }
         }
         return null;
     }
 
-    private static java.util.Optional<String> productionNameForTest(ArchitectureContext context, String testClassName) {
+    private static Optional<String> productionNameForTest(ArchitectureContext context, String testClassName) {
         if (!testClassName.endsWith("Test")) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
         String productionName = testClassName.substring(0, testClassName.length() - 4);
         return context.productionClasses().stream()
                 .map(ProductionClass::className)
                 .filter(productionName::equals)
                 .findFirst();
+    }
+
+    private static boolean looksLikeTestType(String className) {
+        int separator = className.lastIndexOf('.');
+        String simpleName = separator < 0 ? className : className.substring(separator + 1);
+        return simpleName.endsWith("Test") || simpleName.endsWith("IT");
+    }
+
+    private static String policyReference() {
+        return "tavall-docs/docs/quality/code-architecture/TESTING_AND_GIT.md";
+    }
+
+    private record TestImports(
+            boolean junit4Imported,
+            boolean jupiterWildcard,
+            Set<String> jupiterAnnotations
+    ) {
     }
 
     private static final class TestTreeScanner extends TreeScanner<Void, Void> {
