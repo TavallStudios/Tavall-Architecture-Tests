@@ -9,23 +9,42 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public final class ArchitectureContext {
     private final List<Path> classRoots;
     private final List<Path> sourceRoots;
+    private final List<Path> testSourceRoots;
     private final ClassLoader classLoader;
+    private final JavaSourceIndex productionSources;
+    private final JavaSourceIndex testSources;
+    private volatile List<ProductionClass> productionClasses;
 
-    private ArchitectureContext(List<Path> classRoots, List<Path> sourceRoots, ClassLoader classLoader) {
+    private ArchitectureContext(
+            List<Path> classRoots,
+            List<Path> sourceRoots,
+            List<Path> testSourceRoots,
+            ClassLoader classLoader
+    ) {
         this.classRoots = List.copyOf(classRoots);
         this.sourceRoots = List.copyOf(sourceRoots);
+        this.testSourceRoots = List.copyOf(testSourceRoots);
         this.classLoader = classLoader;
+        this.productionSources = JavaSourceIndex.parse(sourceRoots);
+        this.testSources = JavaSourceIndex.parse(testSourceRoots);
     }
 
     public static ArchitectureContext fromSystemProperties() {
         List<Path> classRoots = parseRoots("tavall.architecture.classRoots", true);
         List<Path> sourceRoots = parseRoots("tavall.architecture.sourceRoots", false);
-        return new ArchitectureContext(classRoots, sourceRoots, Thread.currentThread().getContextClassLoader());
+        List<Path> testSourceRoots = parseRoots("tavall.architecture.testSourceRoots", false);
+        return new ArchitectureContext(
+                classRoots,
+                sourceRoots,
+                testSourceRoots,
+                Thread.currentThread().getContextClassLoader()
+        );
     }
 
     public List<Path> classRoots() {
@@ -36,11 +55,71 @@ public final class ArchitectureContext {
         return sourceRoots;
     }
 
+    public List<Path> testSourceRoots() {
+        return testSourceRoots;
+    }
+
     public ClassLoader classLoader() {
         return classLoader;
     }
 
+    public JavaSourceIndex productionSources() {
+        return productionSources;
+    }
+
+    public JavaSourceIndex testSources() {
+        return testSources;
+    }
+
     public List<ProductionClass> productionClasses() {
+        List<ProductionClass> cached = productionClasses;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (productionClasses == null) {
+                productionClasses = discoverProductionClasses();
+            }
+            return productionClasses;
+        }
+    }
+
+    public Optional<String> productionClassNameForSubject(String subject) {
+        String candidate = subject;
+        int relation = candidate.indexOf("->");
+        if (relation >= 0) {
+            candidate = candidate.substring(0, relation);
+        }
+        int member = candidate.indexOf('#');
+        if (member >= 0) {
+            candidate = candidate.substring(0, member);
+        }
+        String finalCandidate = candidate;
+        if (productionClasses().stream().anyMatch(type -> type.className().equals(finalCandidate))) {
+            return Optional.of(finalCandidate);
+        }
+        if (candidate.endsWith(".java")) {
+            return productionSources.classNameForRelativePath(candidate);
+        }
+        return Optional.empty();
+    }
+
+    public Optional<SourceLocation> locateSubject(String subject) {
+        Optional<String> className = productionClassNameForSubject(subject);
+        if (className.isPresent()) {
+            Optional<SourceLocation> location = productionSources.locateClass(className.get());
+            if (location.isPresent()) {
+                return location;
+            }
+        }
+        if (subject.endsWith(".java")) {
+            return productionSources.findByRelativePath(subject)
+                    .map(unit -> SourceLocation.file(unit.relativePath()));
+        }
+        return Optional.empty();
+    }
+
+    private List<ProductionClass> discoverProductionClasses() {
         Map<String, List<Path>> origins = new LinkedHashMap<>();
         for (Path root : classRoots) {
             try (Stream<Path> paths = Files.walk(root)) {
