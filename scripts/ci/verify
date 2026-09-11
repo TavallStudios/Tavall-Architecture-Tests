@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+profile="${1:-architecture-combined}"
+
+case "${profile}" in
+  architecture-combined|architecture|default|all)
+    ;;
+  *)
+    echo "Unsupported CI profile: ${profile}" >&2
+    exit 64
+    ;;
+esac
+
+if [[ -x ./gradlew && -f ./gradle/wrapper/gradle-wrapper.jar ]]; then
+  gradle_cmd=(./gradlew)
+elif command -v gradle >/dev/null 2>&1; then
+  gradle_cmd=(gradle)
+else
+  echo "No Gradle executor is available. Expected a complete ./gradlew wrapper or gradle on PATH." >&2
+  exit 69
+fi
+
+printf 'Repository: %s\n' "$(git config --get remote.origin.url 2>/dev/null || printf 'unknown')"
+printf 'Head: %s\n' "$(git rev-parse HEAD)"
+printf 'Profile: %s\n' "${profile}"
+
+"${gradle_cmd[@]}" --version
+"${gradle_cmd[@]}" clean check --no-daemon --stacktrace
+
+# Publication metadata is part of the consumer contract. Validate every module,
+# the implementation plugin, and the generated Gradle plugin marker locally
+# without mutating the remote package registry.
+"${gradle_cmd[@]}" --no-daemon --stacktrace \
+  :gradle-plugin:publishToMavenLocal \
+  :modules:core:publishToMavenLocal \
+  :modules:patterns:publishToMavenLocal \
+  :modules:di:publishToMavenLocal \
+  :modules:registry:publishToMavenLocal \
+  :modules:cache:publishToMavenLocal \
+  :modules:database:publishToMavenLocal \
+  :modules:runtime:publishToMavenLocal
