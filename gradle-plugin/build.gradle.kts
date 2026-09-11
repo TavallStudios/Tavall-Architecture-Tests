@@ -15,7 +15,7 @@ gradlePlugin {
             id = "org.tavall.architecture-tests"
             implementationClass = "org.tavall.architecture.gradle.TavallArchitectureTestsPlugin"
             displayName = "Tavall Architecture Tests"
-            description = "Runs selected canonical Tavall architecture-test modules against a consumer project."
+            description = "Runs selected canonical Tavall architecture-test modules against production targets owned by a repository test suite."
         }
     }
 }
