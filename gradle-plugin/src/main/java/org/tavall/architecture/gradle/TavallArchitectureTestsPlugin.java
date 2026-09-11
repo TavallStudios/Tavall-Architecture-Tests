@@ -13,9 +13,12 @@ import org.gradle.api.tasks.testing.Test;
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
@@ -35,6 +38,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                 TavallArchitectureTestsExtension.class
         );
         extension.getModules().convention(List.of("core", "patterns"));
+        extension.getTargetProjects().convention(List.of());
 
         Configuration moduleArtifacts = project.getConfigurations().create(
                 "tavallArchitectureTestModules",
@@ -51,9 +55,6 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                     configuration.setCanBeResolved(true);
                 }
         );
-
-        SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
-        SourceSet main = sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
 
         TaskProvider<Sync> unpack = project.getTasks().register(
                 "unpackTavallArchitectureTests",
@@ -73,62 +74,160 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                 "architectureTest",
                 Test.class,
                 task -> {
-                    task.setDescription("Runs canonical Tavall architecture tests against this consumer.");
+                    task.setDescription("Runs canonical Tavall architecture tests against configured production targets.");
                     task.setGroup("verification");
-                    task.dependsOn(project.getTasks().named(JavaPlugin.CLASSES_TASK_NAME), unpack);
+                    task.dependsOn(unpack);
                     task.setTestClassesDirs(project.files(unpack.map(Sync::getDestinationDir)));
-                    task.setClasspath(project.files(
-                            unpack.map(Sync::getDestinationDir),
-                            runtime,
-                            main.getOutput(),
-                            main.getRuntimeClasspath()
-                    ));
                     task.useJUnitPlatform();
                     task.setMaxParallelForks(1);
                     task.getTestLogging().setExceptionFormat(TestExceptionFormat.FULL);
                     task.getTestLogging().setShowCauses(true);
                     task.getTestLogging().setShowExceptions(true);
                     task.getTestLogging().setShowStackTraces(true);
-                    task.doFirst(ignored -> {
-                        task.systemProperty(
-                                "tavall.architecture.classRoots",
-                                main.getOutput().getClassesDirs().getAsPath()
-                        );
-                        String sourceRoots = main.getAllJava().getSourceDirectories().getFiles().stream()
-                                .map(File::getAbsolutePath)
-                                .sorted()
-                                .reduce((left, right) -> left + File.pathSeparator + right)
-                                .orElse("");
-                        task.systemProperty("tavall.architecture.sourceRoots", sourceRoots);
-                        if (extension.getDebtFile().isPresent()) {
-                            task.systemProperty(
-                                    "tavall.architecture.debtFile",
-                                    extension.getDebtFile().get().getAsFile().getAbsolutePath()
-                            );
-                        }
-                    });
                 }
         );
 
         project.getTasks().named("check").configure(task -> task.dependsOn(architectureTest));
 
-        project.afterEvaluate(ignored -> {
-            String version = architectureVersion(project);
-            LinkedHashSet<String> selected = new LinkedHashSet<>();
-            selected.add("core");
-            for (String requested : extension.getModules().get()) {
-                String module = requested.toLowerCase(Locale.ROOT).strip();
-                if (!SUPPORTED_MODULES.contains(module)) {
-                    throw new IllegalArgumentException("Unknown Tavall architecture-test module: " + requested);
-                }
-                selected.add(module);
+        project.afterEvaluate(ignored -> configureRuleModules(project, extension, moduleArtifacts, runtime));
+
+        project.getGradle().projectsEvaluated(ignored -> {
+            List<ArchitectureTarget> targets = architectureTargets(project, extension);
+            architectureTest.configure(task -> configureArchitectureTask(
+                    project,
+                    extension,
+                    runtime,
+                    unpack,
+                    task,
+                    targets
+            ));
+        });
+    }
+
+    private static void configureRuleModules(
+            Project project,
+            TavallArchitectureTestsExtension extension,
+            Configuration moduleArtifacts,
+            Configuration runtime
+    ) {
+        String version = architectureVersion(project);
+        LinkedHashSet<String> selected = new LinkedHashSet<>();
+        selected.add("core");
+        for (String requested : extension.getModules().get()) {
+            String module = requested.toLowerCase(Locale.ROOT).strip();
+            if (!SUPPORTED_MODULES.contains(module)) {
+                throw new IllegalArgumentException("Unknown Tavall architecture-test module: " + requested);
             }
-            for (String module : selected) {
-                String coordinate = "org.tavall:tavall-architecture-" + module + ":" + version;
-                project.getDependencies().add(moduleArtifacts.getName(), coordinate);
-                project.getDependencies().add(runtime.getName(), coordinate);
+            selected.add(module);
+        }
+        for (String module : selected) {
+            String coordinate = "org.tavall:tavall-architecture-" + module + ":" + version;
+            project.getDependencies().add(moduleArtifacts.getName(), coordinate);
+            project.getDependencies().add(runtime.getName(), coordinate);
+        }
+    }
+
+    private static void configureArchitectureTask(
+            Project project,
+            TavallArchitectureTestsExtension extension,
+            Configuration runtime,
+            TaskProvider<Sync> unpack,
+            Test task,
+            List<ArchitectureTarget> targets
+    ) {
+        task.dependsOn(targets.stream()
+                .map(target -> target.project().getTasks().named(JavaPlugin.CLASSES_TASK_NAME))
+                .toList());
+
+        List<Object> targetClasspath = new ArrayList<>();
+        for (ArchitectureTarget target : targets) {
+            targetClasspath.add(target.main().getOutput());
+            targetClasspath.add(target.main().getRuntimeClasspath());
+        }
+        task.setClasspath(project.files(
+                unpack.map(Sync::getDestinationDir),
+                runtime,
+                targetClasspath
+        ));
+
+        task.doFirst(ignored -> {
+            String classRoots = joinExistingDirectories(targets.stream()
+                    .flatMap(target -> target.main().getOutput().getClassesDirs().getFiles().stream())
+                    .toList());
+            if (classRoots.isBlank()) {
+                throw new IllegalStateException("No compiled Tavall production class roots were found for architecture targets");
+            }
+            task.systemProperty("tavall.architecture.classRoots", classRoots);
+
+            String sourceRoots = joinExistingDirectories(targets.stream()
+                    .flatMap(target -> target.main().getAllJava().getSourceDirectories().getFiles().stream())
+                    .toList());
+            task.systemProperty("tavall.architecture.sourceRoots", sourceRoots);
+            task.systemProperty(
+                    "tavall.architecture.targetProjects",
+                    targets.stream().map(target -> target.project().getPath()).sorted().reduce(
+                            (left, right) -> left + "," + right
+                    ).orElse("")
+            );
+
+            if (extension.getDebtFile().isPresent()) {
+                task.systemProperty(
+                        "tavall.architecture.debtFile",
+                        extension.getDebtFile().get().getAsFile().getAbsolutePath()
+                );
             }
         });
+    }
+
+    private static List<ArchitectureTarget> architectureTargets(
+            Project applyingProject,
+            TavallArchitectureTestsExtension extension
+    ) {
+        List<String> configured = extension.getTargetProjects().get();
+        List<Project> projects;
+        if (configured.isEmpty()) {
+            projects = List.of(applyingProject);
+        } else {
+            Map<String, Project> resolved = new LinkedHashMap<>();
+            for (String rawPath : configured) {
+                String requested = rawPath == null ? "" : rawPath.strip();
+                if (requested.isEmpty()) {
+                    throw new IllegalArgumentException("Architecture target project path must not be blank");
+                }
+                String path = requested.equals(":") || requested.startsWith(":")
+                        ? requested
+                        : ":" + requested;
+                Project target = applyingProject.getRootProject().findProject(path);
+                if (target == null) {
+                    throw new IllegalArgumentException("Unknown Tavall architecture target project: " + rawPath);
+                }
+                resolved.putIfAbsent(target.getPath(), target);
+            }
+            projects = List.copyOf(resolved.values());
+        }
+
+        return projects.stream().map(target -> {
+            SourceSetContainer sourceSets = target.getExtensions().findByType(SourceSetContainer.class);
+            if (sourceSets == null) {
+                throw new IllegalArgumentException(
+                        "Tavall architecture target does not expose Java source sets: " + target.getPath()
+                );
+            }
+            return new ArchitectureTarget(
+                    target,
+                    sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME)
+            );
+        }).toList();
+    }
+
+    private static String joinExistingDirectories(List<File> directories) {
+        return directories.stream()
+                .filter(File::isDirectory)
+                .map(File::getAbsolutePath)
+                .distinct()
+                .sorted()
+                .reduce((left, right) -> left + File.pathSeparator + right)
+                .orElse("");
     }
 
     private static void configureArchitectureRepository(Project project) {
@@ -164,5 +263,8 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
             );
         }
         return version;
+    }
+
+    private record ArchitectureTarget(Project project, SourceSet main) {
     }
 }
