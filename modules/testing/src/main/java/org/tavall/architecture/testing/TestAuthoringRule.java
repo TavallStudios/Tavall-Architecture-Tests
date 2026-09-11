@@ -165,6 +165,15 @@ public final class TestAuthoringRule implements ArchitectureRule {
                         unit.location(method).orElse(testType.location())
                 ));
             }
+            if (!containsBehaviorAssertion(method)) {
+                findings.add(finding(
+                        "missing-behavior-assertion",
+                        productionName + "#assertion:" + methodName,
+                        productionName,
+                        "Behavior test must observe a result with an assertion/verification instead of only executing code",
+                        unit.location(method).orElse(testType.location())
+                ));
+            }
         }
         if (executableTests == 0) {
             findings.add(finding(
@@ -206,6 +215,26 @@ public final class TestAuthoringRule implements ArchitectureRule {
                     scanner.directConstructionLocation
             ));
         }
+    }
+
+    private static boolean containsBehaviorAssertion(MethodTree method) {
+        Boolean result = new TreeScanner<Boolean, Void>() {
+            @Override
+            public Boolean reduce(Boolean left, Boolean right) {
+                return Boolean.TRUE.equals(left) || Boolean.TRUE.equals(right);
+            }
+
+            @Override
+            public Boolean visitMethodInvocation(MethodInvocationTree node, Void unused) {
+                String select = node.getMethodSelect().toString();
+                String simple = select.substring(select.lastIndexOf('.') + 1);
+                if (simple.startsWith("assert") || simple.equals("verify") || simple.equals("fail")) {
+                    return true;
+                }
+                return super.visitMethodInvocation(node, unused);
+            }
+        }.scan(method.getBody(), null);
+        return Boolean.TRUE.equals(result);
     }
 
     private ArchitectureFinding finding(

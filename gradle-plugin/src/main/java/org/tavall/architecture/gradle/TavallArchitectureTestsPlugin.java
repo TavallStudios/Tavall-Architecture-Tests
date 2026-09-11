@@ -1,18 +1,24 @@
 package org.tavall.architecture.gradle;
 
+import org.gradle.api.DefaultTask;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.repositories.PasswordCredentials;
 import org.gradle.api.plugins.JavaPlugin;
+import org.gradle.api.tasks.JavaExec;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.Sync;
 import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.testing.Test;
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat;
+import org.tavall.architecture.core.TestAuthoringPolicy;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -25,7 +31,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
     private static final String PACKAGES_URL =
             "https://maven.pkg.github.com/TavallStudios/Tavall-Architecture-Tests";
     private static final Set<String> SUPPORTED_MODULES = Set.of(
-            "core", "patterns", "di", "registry", "cache", "database", "runtime"
+            "core", "patterns", "testing", "di", "registry", "cache", "database", "runtime"
     );
 
     @Override
@@ -37,7 +43,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                 "architectureTests",
                 TavallArchitectureTestsExtension.class
         );
-        extension.getModules().convention(List.of("core", "patterns"));
+        extension.getModules().convention(List.of("core", "patterns", "testing"));
         extension.getTargetProjects().convention(List.of());
 
         Configuration moduleArtifacts = project.getConfigurations().create(
@@ -87,13 +93,31 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                 }
         );
 
-        project.getTasks().named("check").configure(task -> task.dependsOn(architectureTest));
+        TaskProvider<JavaExec> architectureAnalyze = project.getTasks().register(
+                "architectureAnalyze",
+                JavaExec.class,
+                task -> {
+                    task.setDescription("Analyzes production classes and test authoring with per-class Tavall architecture results.");
+                    task.setGroup("verification");
+                    task.getMainClass().set("org.tavall.architecture.core.ArchitectureAnalysisMain");
+                }
+        );
 
+        TaskProvider<DefaultTask> generateTestScaffold = project.getTasks().register(
+                "generateTavallTestScaffold",
+                DefaultTask.class,
+                task -> {
+                    task.setDescription("Creates a fail-closed JUnit 5 scaffold for -PtavallTestClass=<production FQCN>.");
+                    task.setGroup("verification");
+                }
+        );
+
+        project.getTasks().named("check").configure(task -> task.dependsOn(architectureTest));
         project.afterEvaluate(ignored -> configureRuleModules(project, extension, moduleArtifacts, runtime));
 
         project.getGradle().projectsEvaluated(ignored -> {
             List<ArchitectureTarget> targets = architectureTargets(project, extension);
-            architectureTest.configure(task -> configureArchitectureTask(
+            architectureTest.configure(task -> configureArchitectureTest(
                     project,
                     extension,
                     runtime,
@@ -101,6 +125,14 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                     task,
                     targets
             ));
+            architectureAnalyze.configure(task -> configureArchitectureAnalysis(
+                    project,
+                    extension,
+                    runtime,
+                    task,
+                    targets
+            ));
+            generateTestScaffold.configure(task -> task.doLast(unused -> generateTestScaffold(project, targets)));
         });
     }
 
@@ -127,7 +159,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
         }
     }
 
-    private static void configureArchitectureTask(
+    private static void configureArchitectureTest(
             Project project,
             TavallArchitectureTestsExtension extension,
             Configuration runtime,
@@ -135,48 +167,131 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
             Test task,
             List<ArchitectureTarget> targets
     ) {
-        task.dependsOn(targets.stream()
-                .map(target -> target.project().getTasks().named(JavaPlugin.CLASSES_TASK_NAME))
-                .toList());
+        task.dependsOn(targetClassTasks(targets));
+        task.setClasspath(project.files(
+                unpack.map(Sync::getDestinationDir),
+                runtime,
+                targetClasspath(targets)
+        ));
+        task.doFirst(ignored -> task.systemProperties(architectureSystemProperties(project, extension, targets)));
+    }
 
+    private static void configureArchitectureAnalysis(
+            Project project,
+            TavallArchitectureTestsExtension extension,
+            Configuration runtime,
+            JavaExec task,
+            List<ArchitectureTarget> targets
+    ) {
+        task.dependsOn(targetClassTasks(targets));
+        task.setClasspath(project.files(runtime, targetClasspath(targets)));
+        task.doFirst(ignored -> task.systemProperties(architectureSystemProperties(project, extension, targets)));
+    }
+
+    private static List<Object> targetClasspath(List<ArchitectureTarget> targets) {
         List<Object> targetClasspath = new ArrayList<>();
         for (ArchitectureTarget target : targets) {
             targetClasspath.add(target.main().getOutput());
             targetClasspath.add(target.main().getRuntimeClasspath());
         }
-        task.setClasspath(project.files(
-                unpack.map(Sync::getDestinationDir),
-                runtime,
-                targetClasspath
-        ));
+        return List.copyOf(targetClasspath);
+    }
 
-        task.doFirst(ignored -> {
-            String classRoots = joinExistingDirectories(targets.stream()
-                    .flatMap(target -> target.main().getOutput().getClassesDirs().getFiles().stream())
-                    .toList());
-            if (classRoots.isBlank()) {
-                throw new IllegalStateException("No compiled Tavall production class roots were found for architecture targets");
-            }
-            task.systemProperty("tavall.architecture.classRoots", classRoots);
+    private static List<?> targetClassTasks(List<ArchitectureTarget> targets) {
+        return targets.stream()
+                .map(target -> target.project().getTasks().named(JavaPlugin.CLASSES_TASK_NAME))
+                .toList();
+    }
 
-            String sourceRoots = joinExistingDirectories(targets.stream()
-                    .flatMap(target -> target.main().getAllJava().getSourceDirectories().getFiles().stream())
-                    .toList());
-            task.systemProperty("tavall.architecture.sourceRoots", sourceRoots);
-            task.systemProperty(
-                    "tavall.architecture.targetProjects",
-                    targets.stream().map(target -> target.project().getPath()).sorted().reduce(
-                            (left, right) -> left + "," + right
-                    ).orElse("")
+    private static Map<String, Object> architectureSystemProperties(
+            Project project,
+            TavallArchitectureTestsExtension extension,
+            List<ArchitectureTarget> targets
+    ) {
+        String classRoots = joinExistingDirectories(targets.stream()
+                .flatMap(target -> target.main().getOutput().getClassesDirs().getFiles().stream())
+                .toList());
+        if (classRoots.isBlank()) {
+            throw new IllegalStateException("No compiled Tavall production class roots were found for architecture targets");
+        }
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("tavall.architecture.classRoots", classRoots);
+        properties.put("tavall.architecture.sourceRoots", joinExistingDirectories(targets.stream()
+                .flatMap(target -> target.main().getAllJava().getSourceDirectories().getFiles().stream())
+                .toList()));
+        properties.put("tavall.architecture.testSourceRoots", joinExistingDirectories(targets.stream()
+                .flatMap(target -> target.test().getAllJava().getSourceDirectories().getFiles().stream())
+                .toList()));
+        properties.put(
+                "tavall.architecture.targetProjects",
+                targets.stream().map(target -> target.project().getPath()).sorted().reduce(
+                        (left, right) -> left + "," + right
+                ).orElse("")
+        );
+        properties.put(
+                "tavall.architecture.reportFile",
+                project.getLayout().getBuildDirectory()
+                        .file("reports/tavall-architecture/architecture-report.json")
+                        .get().getAsFile().getAbsolutePath()
+        );
+        if (extension.getDebtFile().isPresent()) {
+            properties.put(
+                    "tavall.architecture.debtFile",
+                    extension.getDebtFile().get().getAsFile().getAbsolutePath()
             );
+        }
+        return Map.copyOf(properties);
+    }
 
-            if (extension.getDebtFile().isPresent()) {
-                task.systemProperty(
-                        "tavall.architecture.debtFile",
-                        extension.getDebtFile().get().getAsFile().getAbsolutePath()
-                );
-            }
-        });
+    private static void generateTestScaffold(Project applyingProject, List<ArchitectureTarget> targets) {
+        Object configured = applyingProject.findProperty("tavallTestClass");
+        if (configured == null || configured.toString().isBlank()) {
+            throw new IllegalArgumentException(
+                    "generateTavallTestScaffold requires -PtavallTestClass=<org.tavall.production.Type>"
+            );
+        }
+        String className = configured.toString().strip();
+        if (!className.startsWith("org.tavall.")) {
+            throw new IllegalArgumentException("Tavall test scaffold target must be an org.tavall production class: " + className);
+        }
+        String topLevelClass = className.contains("$") ? className.substring(0, className.indexOf('$')) : className;
+        String productionRelativePath = topLevelClass.replace('.', File.separatorChar) + ".java";
+        List<ArchitectureTarget> owners = targets.stream().filter(target ->
+                target.main().getAllJava().getSourceDirectories().getFiles().stream()
+                        .map(root -> new File(root, productionRelativePath))
+                        .anyMatch(File::isFile)
+        ).toList();
+        if (owners.size() != 1) {
+            throw new IllegalStateException(
+                    "Expected exactly one architecture target to own " + className + " but found " + owners.size()
+            );
+        }
+        ArchitectureTarget owner = owners.getFirst();
+        File testRoot = preferredTestSourceRoot(owner);
+        Path output = testRoot.toPath().resolve(TestAuthoringPolicy.expectedTestRelativePath(className));
+        if (Files.exists(output)) {
+            throw new IllegalStateException("Test source already exists: " + output);
+        }
+        try {
+            Files.createDirectories(output.getParent());
+            Files.writeString(output, TestAuthoringPolicy.renderScaffold(className));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to create Tavall test scaffold " + output, exception);
+        }
+        applyingProject.getLogger().lifecycle("Created fail-closed Tavall test scaffold: {}", output);
+    }
+
+    private static File preferredTestSourceRoot(ArchitectureTarget target) {
+        File conventional = new File(target.project().getProjectDir(), "src/test/java").getAbsoluteFile();
+        List<File> configured = target.test().getAllJava().getSourceDirectories().getFiles().stream()
+                .map(File::getAbsoluteFile)
+                .sorted(java.util.Comparator.comparing(File::getAbsolutePath))
+                .toList();
+        if (configured.contains(conventional) || configured.isEmpty()) {
+            return conventional;
+        }
+        return configured.getFirst();
     }
 
     private static List<ArchitectureTarget> architectureTargets(
@@ -215,7 +330,8 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
             }
             return new ArchitectureTarget(
                     target,
-                    sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME)
+                    sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME),
+                    sourceSets.getByName(SourceSet.TEST_SOURCE_SET_NAME)
             );
         }).toList();
     }
@@ -265,6 +381,6 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
         return version;
     }
 
-    private record ArchitectureTarget(Project project, SourceSet main) {
+    private record ArchitectureTarget(Project project, SourceSet main, SourceSet test) {
     }
 }
