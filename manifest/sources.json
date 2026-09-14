@@ -3,7 +3,7 @@
   "canonicalRepository": "TavallStudios/Tavall-Architecture-Tests",
   "imports": [
     {
-      "repository": "TavallStudios/tavall-project-novus",
+      "repository": "TavallStudios/tavall-mc",
       "commit": "705a17b7db22a6012f3cdefe99328129842301a0",
       "files": [
         {"path":"tavall-architecture-tests/build.gradle.kts","blob":"a52132af35e28a6dfa0b693bbf2056050ab9fd0a"},
