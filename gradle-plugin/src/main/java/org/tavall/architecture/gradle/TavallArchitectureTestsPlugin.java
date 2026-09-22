@@ -142,6 +142,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
         List<Object> targetClasspath = new ArrayList<>();
         for (ArchitectureTarget target : targets) {
             targetClasspath.add(target.main().getOutput());
+            targetClasspath.add(target.main().getCompileClasspath());
             targetClasspath.add(target.main().getRuntimeClasspath());
         }
         task.setClasspath(project.files(
