@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class DependencyInjectionRule implements ArchitectureRule {
     private static final Set<String> RETIRED_DI_MARKERS = Set.of(
@@ -32,11 +33,13 @@ public final class DependencyInjectionRule implements ArchitectureRule {
                 continue;
             }
             Class<?> type = productionClass.type();
-            for (String marker : findRetiredMarkers(type, new HashSet<>())) {
+            Set<String> retiredMarkers = findRetiredMarkers(type, new HashSet<>());
+            if (!retiredMarkers.isEmpty()) {
                 violations.add(new ArchitectureViolation(
                         "retired-di-marker",
                         type.getName(),
-                        "Production type still depends on retired DI marker " + marker
+                        "Production type still depends on retired DI markers "
+                                + retiredMarkers.stream().sorted().collect(Collectors.joining(", "))
                 ));
             }
             DelegatesTo delegatesTo = type.getAnnotation(DelegatesTo.class);
