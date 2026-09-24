@@ -232,7 +232,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
     }
 
     private static void configureArchitectureRepository(Project project) {
-        String token = System.getenv("GITHUB_TOKEN");
+        String token = githubToken(System.getenv());
         if (token == null || token.isBlank()) {
             return;
         }
@@ -249,6 +249,14 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                 credentials.setPassword(token);
             });
         });
+    }
+
+    static String githubToken(Map<String, String> environment) {
+        String githubToken = environment.get("GITHUB_TOKEN");
+        if (githubToken != null && !githubToken.isBlank()) {
+            return githubToken;
+        }
+        return environment.get("GH_TOKEN");
     }
 
     private static String architectureVersion(Project project) {

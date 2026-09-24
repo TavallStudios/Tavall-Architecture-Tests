@@ -11,12 +11,25 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class TavallArchitectureTestsPluginTest {
+    @Test
+    void tavallGitHubTokenIsUsedWhenGithubActionsTokenIsAbsent() {
+        assertEquals("tavall-token", TavallArchitectureTestsPlugin.githubToken(Map.of("GH_TOKEN", "tavall-token")));
+        assertEquals(
+                "github-actions-token",
+                TavallArchitectureTestsPlugin.githubToken(Map.of(
+                        "GITHUB_TOKEN", "github-actions-token",
+                        "GH_TOKEN", "tavall-token"
+                ))
+        );
+    }
+
     @Test
     void applyingPluginRegistersExecutableArchitectureGate() {
         Project project = ProjectBuilder.builder().build();

@@ -19,7 +19,9 @@ subprojects {
 
     repositories {
         mavenCentral()
-        val githubToken = providers.environmentVariable("GITHUB_TOKEN").orNull
+        val githubToken = providers.environmentVariable("GITHUB_TOKEN")
+            .orElse(providers.environmentVariable("GH_TOKEN"))
+            .orNull
         if (!githubToken.isNullOrBlank()) {
             listOf(
                 "Tavall-Architecture-Tests",
@@ -77,6 +79,7 @@ subprojects {
                         url = uri(privateRepository.get())
                     }
                     val token = providers.environmentVariable("GITHUB_TOKEN")
+                        .orElse(providers.environmentVariable("GH_TOKEN"))
                 if (token.isPresent) {
                     maven {
                         name = "GitHubPackages"
