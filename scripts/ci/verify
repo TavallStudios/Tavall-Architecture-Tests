@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export TAVALL_PRIVATE_MAVEN_REPOSITORY="${TAVALL_PRIVATE_MAVEN_REPOSITORY:-/srv/dev-storage/deps/private}"
+
 profile="${1:-architecture-combined}"
 
 case "${profile}" in
@@ -32,11 +34,12 @@ printf 'Profile: %s\n' "${profile}"
 # the implementation plugin, and the generated Gradle plugin marker locally
 # without mutating the remote package registry.
 "${gradle_cmd[@]}" --no-daemon --stacktrace \
-  :gradle-plugin:publishToMavenLocal \
-  :modules:core:publishToMavenLocal \
-  :modules:patterns:publishToMavenLocal \
-  :modules:di:publishToMavenLocal \
-  :modules:registry:publishToMavenLocal \
-  :modules:cache:publishToMavenLocal \
-  :modules:database:publishToMavenLocal \
-  :modules:runtime:publishToMavenLocal
+  :gradle-plugin:publishAllPublicationsToTavallPrivateRepository \
+  :modules:core:publishAllPublicationsToTavallPrivateRepository \
+  :modules:patterns:publishAllPublicationsToTavallPrivateRepository \
+  :modules:di:publishAllPublicationsToTavallPrivateRepository \
+  :modules:registry:publishAllPublicationsToTavallPrivateRepository \
+  :modules:cache:publishAllPublicationsToTavallPrivateRepository \
+  :modules:database:publishAllPublicationsToTavallPrivateRepository \
+  :modules:runtime:publishAllPublicationsToTavallPrivateRepository \
+  :modules:web:publishAllPublicationsToTavallPrivateRepository

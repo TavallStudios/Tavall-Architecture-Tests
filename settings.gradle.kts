@@ -8,5 +8,6 @@ include(
     ":modules:cache",
     ":modules:database",
     ":modules:runtime",
+    ":modules:web",
     ":gradle-plugin",
 )

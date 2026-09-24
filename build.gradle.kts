@@ -60,16 +60,23 @@ subprojects {
         }
     }
 
-    pluginManager.withPlugin("maven-publish") {
-        extensions.configure<PublishingExtension> {
+        pluginManager.withPlugin("maven-publish") {
+            extensions.configure<PublishingExtension> {
             if (project.path.startsWith(":modules:")) {
                 publications.create<MavenPublication>("mavenJava") {
                     from(components["java"])
                     artifactId = "tavall-architecture-${project.name}"
                 }
-            }
-            repositories {
-                val token = providers.environmentVariable("GITHUB_TOKEN")
+                }
+                repositories {
+                    val privateRepository = providers.gradleProperty("tavallPrivateMavenRepository")
+                        .orElse(providers.environmentVariable("TAVALL_PRIVATE_MAVEN_REPOSITORY"))
+                        .orElse("/srv/dev-storage/deps/private")
+                    maven {
+                        name = "TavallPrivate"
+                        url = uri(privateRepository.get())
+                    }
+                    val token = providers.environmentVariable("GITHUB_TOKEN")
                 if (token.isPresent) {
                     maven {
                         name = "GitHubPackages"

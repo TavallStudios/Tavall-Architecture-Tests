@@ -30,6 +30,34 @@ final class TavallArchitectureTestsPluginTest {
     }
 
     @Test
+    void webArchitectureModuleIsSelectable(@TempDir Path projectDirectory) throws IOException {
+        Files.writeString(
+                projectDirectory.resolve("settings.gradle.kts"),
+                "rootProject.name = \"web-rule-consumer\"\n"
+        );
+        Files.writeString(
+                projectDirectory.resolve("build.gradle.kts"),
+                """
+                plugins {
+                    java
+                    id("org.tavall.architecture-tests")
+                }
+
+                architectureTests {
+                    modules.set(listOf("web"))
+                }
+                """
+        );
+
+        BuildResult result = runner(projectDirectory)
+                .withArguments("tasks", "-PtavallArchitectureVersion=" + architectureVersion())
+                .build();
+
+        assertNotNull(result.task(":tasks"));
+        assertEquals(TaskOutcome.SUCCESS, result.task(":tasks").getOutcome());
+    }
+
+    @Test
     void consumerCheckExecutesCanonicalRuleAndThenPassesWhenFixed(@TempDir Path projectDirectory)
             throws IOException {
         String version = architectureVersion();
@@ -47,7 +75,7 @@ final class TavallArchitectureTestsPluginTest {
                 }
 
                 repositories {
-                    mavenLocal()
+                    maven { url = uri(System.getenv("TAVALL_PRIVATE_MAVEN_REPOSITORY") ?: "/srv/dev-storage/deps/private") }
                     mavenCentral()
                 }
 
@@ -132,7 +160,7 @@ final class TavallArchitectureTestsPluginTest {
                 }
 
                 repositories {
-                    mavenLocal()
+                    maven { url = uri(System.getenv("TAVALL_PRIVATE_MAVEN_REPOSITORY") ?: "/srv/dev-storage/deps/private") }
                     mavenCentral()
                 }
 
