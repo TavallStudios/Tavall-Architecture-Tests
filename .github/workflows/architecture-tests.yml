@@ -1,4 +1,4 @@
-name: Architecture Tests
+name: Architecture Tests Source Integrity
 
 on:
   pull_request:
@@ -14,39 +14,25 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 jobs:
-  architecture:
-    name: architecture-combined
+  source-integrity:
+    name: source-integrity
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
     steps:
       - name: Checkout exact head
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Java 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle 9.6.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.6.1'
-
-      - name: Verify exact source
+      - name: Verify source fence
         shell: bash
         run: |
+          set -euo pipefail
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
-          git status --porcelain=v1
-
-      - name: Run repository verification contract
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./scripts/ci/verify architecture-combined
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 .github/scripts/verify_ci_source_state.py \
+            --root . \
+            --expected-head "${GITHUB_SHA}"
+          python3 .github/scripts/verify_ci_source_state.py --self-test
+          echo "Gradle checks and artifact publication run through Tavall CI/local executors."

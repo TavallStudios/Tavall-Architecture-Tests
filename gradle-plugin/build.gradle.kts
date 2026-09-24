@@ -21,10 +21,14 @@ gradlePlugin {
 }
 
 tasks.test {
+    val privateRepository = providers.gradleProperty("tavallPrivateMavenRepository")
+        .orElse(providers.environmentVariable("TAVALL_PRIVATE_MAVEN_REPOSITORY"))
+        .orElse("/srv/dev-storage/deps/private")
     dependsOn(
-        ":modules:core:publishToMavenLocal",
-        ":modules:patterns:publishToMavenLocal",
+        ":modules:core:publishAllPublicationsToTavallPrivateRepository",
+        ":modules:patterns:publishAllPublicationsToTavallPrivateRepository",
     )
+    environment("TAVALL_PRIVATE_MAVEN_REPOSITORY", privateRepository.get())
     systemProperty("tavall.architecture.testVersion", project.version.toString())
     testLogging {
         events("failed", "standardOut", "standardError")

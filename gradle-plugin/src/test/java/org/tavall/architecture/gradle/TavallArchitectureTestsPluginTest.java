@@ -11,12 +11,25 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class TavallArchitectureTestsPluginTest {
+    @Test
+    void tavallGitHubTokenIsUsedWhenGithubActionsTokenIsAbsent() {
+        assertEquals("tavall-token", TavallArchitectureTestsPlugin.githubToken(Map.of("GH_TOKEN", "tavall-token")));
+        assertEquals(
+                "github-actions-token",
+                TavallArchitectureTestsPlugin.githubToken(Map.of(
+                        "GITHUB_TOKEN", "github-actions-token",
+                        "GH_TOKEN", "tavall-token"
+                ))
+        );
+    }
+
     @Test
     void applyingPluginRegistersExecutableArchitectureGate() {
         Project project = ProjectBuilder.builder().build();
@@ -27,6 +40,34 @@ final class TavallArchitectureTestsPluginTest {
         assertTrue(project.getTasks().getByName("check").getTaskDependencies()
                 .getDependencies(project.getTasks().getByName("check"))
                 .contains(project.getTasks().getByName("architectureTest")));
+    }
+
+    @Test
+    void webArchitectureModuleIsSelectable(@TempDir Path projectDirectory) throws IOException {
+        Files.writeString(
+                projectDirectory.resolve("settings.gradle.kts"),
+                "rootProject.name = \"web-rule-consumer\"\n"
+        );
+        Files.writeString(
+                projectDirectory.resolve("build.gradle.kts"),
+                """
+                plugins {
+                    java
+                    id("org.tavall.architecture-tests")
+                }
+
+                architectureTests {
+                    modules.set(listOf("web"))
+                }
+                """
+        );
+
+        BuildResult result = runner(projectDirectory)
+                .withArguments("tasks", "-PtavallArchitectureVersion=" + architectureVersion())
+                .build();
+
+        assertNotNull(result.task(":tasks"));
+        assertEquals(TaskOutcome.SUCCESS, result.task(":tasks").getOutcome());
     }
 
     @Test
@@ -47,7 +88,7 @@ final class TavallArchitectureTestsPluginTest {
                 }
 
                 repositories {
-                    mavenLocal()
+                    maven { url = uri(System.getenv("TAVALL_PRIVATE_MAVEN_REPOSITORY") ?: "/srv/dev-storage/deps/private") }
                     mavenCentral()
                 }
 
@@ -132,7 +173,7 @@ final class TavallArchitectureTestsPluginTest {
                 }
 
                 repositories {
-                    mavenLocal()
+                    maven { url = uri(System.getenv("TAVALL_PRIVATE_MAVEN_REPOSITORY") ?: "/srv/dev-storage/deps/private") }
                     mavenCentral()
                 }
 

@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-profile="${1:-architecture-combined}"
+export TAVALL_PRIVATE_MAVEN_REPOSITORY="${TAVALL_PRIVATE_MAVEN_REPOSITORY:-/srv/dev-storage/deps/private}"
 
-case "${profile}" in
-  architecture-combined|architecture|default|all)
-    ;;
-  *)
-    echo "Unsupported CI profile: ${profile}" >&2
-    exit 64
-    ;;
-esac
+profile="${1:-all}"
 
 if [[ -x ./gradlew && -f ./gradle/wrapper/gradle-wrapper.jar ]]; then
   gradle_cmd=(./gradlew)
@@ -25,18 +18,25 @@ printf 'Repository: %s\n' "$(git config --get remote.origin.url 2>/dev/null || p
 printf 'Head: %s\n' "$(git rev-parse HEAD)"
 printf 'Profile: %s\n' "${profile}"
 
-"${gradle_cmd[@]}" --version
-"${gradle_cmd[@]}" clean check --no-daemon --stacktrace
-
-# Publication metadata is part of the consumer contract. Validate every module,
-# the implementation plugin, and the generated Gradle plugin marker locally
-# without mutating the remote package registry.
-"${gradle_cmd[@]}" --no-daemon --stacktrace \
-  :gradle-plugin:publishToMavenLocal \
-  :modules:core:publishToMavenLocal \
-  :modules:patterns:publishToMavenLocal \
-  :modules:di:publishToMavenLocal \
-  :modules:registry:publishToMavenLocal \
-  :modules:cache:publishToMavenLocal \
-  :modules:database:publishToMavenLocal \
-  :modules:runtime:publishToMavenLocal
+case "${profile}" in
+  build)
+    "${gradle_cmd[@]}" --no-daemon --stacktrace \
+      :modules:web:compileJava \
+      :gradle-plugin:compileJava
+    ;;
+  integration|architecture|architecture-combined|default)
+    "${gradle_cmd[@]}" --no-daemon --stacktrace \
+      :modules:web:check \
+      :gradle-plugin:test
+    ;;
+  all)
+    "${gradle_cmd[@]}" --version
+    "${gradle_cmd[@]}" clean check --no-daemon --stacktrace
+    "${gradle_cmd[@]}" --no-daemon --stacktrace \
+      publishAllPublicationsToTavallPrivateRepository
+    ;;
+  *)
+    echo "Unsupported CI profile: ${profile}" >&2
+    exit 64
+    ;;
+esac

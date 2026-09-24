@@ -1,0 +1,5 @@
+.gradle/
+.tavall/local-ci/
+**/build/
+**/node_modules/
+**/target/

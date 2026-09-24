@@ -62,6 +62,7 @@ Canonical module artifacts are intentionally opt-in rather than one giant `all` 
 - `org.tavall:tavall-architecture-cache`
 - `org.tavall:tavall-architecture-database`
 - `org.tavall:tavall-architecture-runtime`
+- `org.tavall:tavall-architecture-web`
 
 `core` is always included by the plugin. Other executable modules add rules through the `ArchitectureRule` service-provider contract. Tavall-library compile dependencies are compile-only in architecture modules so the gate inspects the consumer's checked-in/runtime dependency versions instead of forcing architecture-test copies of those libraries onto the consumer test runtime. `runtime` supplies shared runtime-test support; product/runtime simulations that require Paper, Discord, Redis, PostgreSQL, or another real runtime remain owned by the consumer repository's testing suite.
 
@@ -85,7 +86,7 @@ The historical `repositories/` tree remains provenance for the original Project 
 
 ## Publishing
 
-Every module and the Gradle plugin publish as Gradle-compatible Maven artifacts to the `Tavall-Architecture-Tests` GitHub Packages repository. Supply `GITHUB_TOKEN`/`GITHUB_ACTOR` when resolving or publishing package artifacts.
+Every module and the Gradle plugin publish as Gradle-compatible Maven artifacts to the `Tavall-Architecture-Tests` GitHub Packages repository. Supply `GITHUB_TOKEN`/`GITHUB_ACTOR` when resolving or publishing package artifacts. Tavall local execution can also set `TAVALL_PRIVATE_MAVEN_REPOSITORY` to publish exact snapshot artifacts to its private DEVELOPMENT Maven repository.
 
 ## Validation boundary
 
