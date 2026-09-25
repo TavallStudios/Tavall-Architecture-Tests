@@ -74,12 +74,12 @@ subprojects {
                 }
                 }
                 repositories {
-                    val privateRepository = providers.gradleProperty("tavallPrivateMavenRepository")
-                        .orElse(providers.environmentVariable("TAVALL_PRIVATE_MAVEN_REPOSITORY"))
-                        .orElse("/srv/dev-storage/deps/private")
+                    val tavallCiRepository = providers.gradleProperty("tavallCiDependencyRepository")
+                        .orElse(providers.environmentVariable("TAVALL_CI_DEPENDENCY_REPOSITORY"))
+                        .orElse(rootProject.layout.buildDirectory.dir("tavall-ci-dependencies").get().asFile.absolutePath)
                     maven {
-                        name = "TavallPrivate"
-                        url = uri(privateRepository.get())
+                        name = "TavallCiDependencies"
+                        url = uri(tavallCiRepository.get())
                     }
                     val token = providers.environmentVariable("GITHUB_TOKEN")
                         .orElse(providers.environmentVariable("GH_TOKEN"))

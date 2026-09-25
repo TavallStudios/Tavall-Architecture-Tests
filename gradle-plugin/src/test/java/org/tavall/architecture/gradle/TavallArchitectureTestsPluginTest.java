@@ -88,7 +88,7 @@ final class TavallArchitectureTestsPluginTest {
                 }
 
                 repositories {
-                    maven { url = uri(System.getenv("TAVALL_PRIVATE_MAVEN_REPOSITORY") ?: "/srv/dev-storage/deps/private") }
+                    maven { url = uri(System.getenv("TAVALL_CI_DEPENDENCY_REPOSITORY") ?: "build/tavall-ci-dependencies") }
                     mavenCentral()
                 }
 
@@ -173,7 +173,7 @@ final class TavallArchitectureTestsPluginTest {
                 }
 
                 repositories {
-                    maven { url = uri(System.getenv("TAVALL_PRIVATE_MAVEN_REPOSITORY") ?: "/srv/dev-storage/deps/private") }
+                    maven { url = uri(System.getenv("TAVALL_CI_DEPENDENCY_REPOSITORY") ?: "build/tavall-ci-dependencies") }
                     mavenCentral()
                 }
 

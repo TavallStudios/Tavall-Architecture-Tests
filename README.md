@@ -84,9 +84,11 @@ Each non-comment line is `<rule-id>|<subject>`. A matching current violation is 
 
 The historical `repositories/` tree remains provenance for the original Project Novus architecture tests and `manifest/sources.json` pins imported blobs. Those snapshots are not the consumer execution mechanism.
 
-## Publishing
+## Publishing and Tavall CI
 
-Every module and the Gradle plugin publish as Gradle-compatible Maven artifacts to the `Tavall-Architecture-Tests` GitHub Packages repository. Supply `GITHUB_TOKEN`/`GITHUB_ACTOR` when resolving or publishing package artifacts. Tavall local execution can also set `TAVALL_PRIVATE_MAVEN_REPOSITORY` to publish exact snapshot artifacts to its private DEVELOPMENT Maven repository.
+Every module and the Gradle plugin publish as Gradle-compatible Maven artifacts for public distribution. GitHub Packages publication is a publication surface; it is not Tavall CI's internal source-resolution authority.
+
+Tavall CI composes this repository at an exact source SHA. The Gradle plugin version and module artifact version are aligned through the `tavallArchitectureVersion` Gradle property. When another exact source build needs architecture modules, Tavall CI publishes only the declared modules to the operation's `TAVALL_CI_DEPENDENCY_REPOSITORY`, then resolves them from that job-scoped file repository. The path is per job and is not Maven Local or a durable shared package authority.
 
 ## Validation boundary
 
