@@ -47,6 +47,9 @@ subprojects {
             isPreserveFileTimestamps = false
             isReproducibleFileOrder = true
             manifest.attributes["Implementation-Version"] = project.version.toString()
+            if (project.path.startsWith(":modules:")) {
+                archiveBaseName.set("tavall-architecture-${project.name}")
+            }
         }
     }
 
