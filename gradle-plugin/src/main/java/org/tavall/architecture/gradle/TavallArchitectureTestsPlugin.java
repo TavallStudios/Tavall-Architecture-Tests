@@ -62,6 +62,7 @@ public final class TavallArchitectureTestsPlugin implements Plugin<Project> {
                 task -> {
                     task.setDescription("Materializes the canonical JUnit entrypoint from tavall-architecture-core.");
                     task.setGroup("verification");
+                    task.dependsOn(moduleArtifacts.getBuildDependencies());
                     task.into(project.getLayout().getBuildDirectory().dir("tavall-architecture-tests/classes"));
                     task.from(project.provider(() -> moduleArtifacts.getFiles().stream()
                             .filter(file -> file.getName().startsWith("tavall-architecture-core-"))
