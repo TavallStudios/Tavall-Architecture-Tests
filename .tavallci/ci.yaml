@@ -1,0 +1,64 @@
+version: 2
+
+source:
+  repository: TavallStudios/Tavall-Architecture-Tests
+  provider: github
+
+build:
+  type: gradle
+  java: 25
+  gradle: 9.6.1
+
+resources:
+  mode: SYSTEM
+
+dependencies:
+  - kind: source
+    identity: TavallStudios/tavall-cache
+    role: SHARED_DEP
+    selector: required-source
+  - kind: source
+    identity: TavallStudios/tavall-database
+    role: SHARED_DEP
+    selector: required-source
+  - kind: source
+    identity: TavallStudios/tavall-di
+    role: SHARED_DEP
+    selector: required-source
+  - kind: source
+    identity: TavallStudios/tavall-logging
+    role: SHARED_DEP
+    selector: required-source
+  - kind: source
+    identity: TavallStudios/tavall-registry
+    role: SHARED_DEP
+    selector: required-source
+
+artifacts:
+  - name: tavall-architecture-gradle-plugin
+    path: gradle-plugin/build/libs/gradle-plugin-1.1.0.jar
+  - name: tavall-architecture-core
+    path: modules/core/build/libs/core-1.1.0.jar
+  - name: tavall-architecture-patterns
+    path: modules/patterns/build/libs/patterns-1.1.0.jar
+  - name: tavall-architecture-di
+    path: modules/di/build/libs/di-1.1.0.jar
+  - name: tavall-architecture-registry
+    path: modules/registry/build/libs/registry-1.1.0.jar
+  - name: tavall-architecture-cache
+    path: modules/cache/build/libs/cache-1.1.0.jar
+  - name: tavall-architecture-database
+    path: modules/database/build/libs/database-1.1.0.jar
+  - name: tavall-architecture-runtime
+    path: modules/runtime/build/libs/runtime-1.1.0.jar
+  - name: tavall-architecture-web
+    path: modules/web/build/libs/web-1.1.0.jar
+
+requiredChecks:
+  - quality
+
+checks:
+  quality:
+    executor: gradle
+    tasks:
+      - check

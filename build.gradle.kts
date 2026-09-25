@@ -11,7 +11,10 @@ plugins {
 }
 
 group = "org.tavall"
-version = providers.gradleProperty("tavallVersion").orElse("0.1.0-SNAPSHOT").get()
+version = providers.gradleProperty("tavallArchitectureVersion")
+    .orElse(providers.gradleProperty("tavallVersion"))
+    .orElse("1.1.0")
+    .get()
 
 subprojects {
     group = rootProject.group
