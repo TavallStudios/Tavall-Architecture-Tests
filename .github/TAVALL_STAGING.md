@@ -10,6 +10,6 @@ Promotion: MANUAL
 ChildMergeTarget: staging/platform
 ```
 
-This branch is the active platform integration target for exact-source build and architecture-test changes. Pull requests remain the work and review records; this file only identifies the repository's integration root.
+This branch is the active platform integration target for exact-source build and architecture-test changes. Its ancestry was refreshed from current `main` before new work was attached. Pull requests remain the work and review records; this file only identifies the repository's integration root.
 
-The current architecture artifact and Gradle-composite work is tracked in PR #14. Its source-level checks, staging integration, and promotion state remain separate validation steps.
+Active child pull requests target this branch or a dependency branch that reaches it. Source-level checks, staging integration, and promotion remain separate validation steps.

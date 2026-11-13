@@ -3,7 +3,7 @@
 This file records the persistent repository/release staging boundary for the
 canonical architecture-test repository.
 
-- Branch: `staging/architecture`
+- Branch: `staging/platform`
 - Parent: `main`
 - Role: repository/release staging
 - State: `ACTIVE`
